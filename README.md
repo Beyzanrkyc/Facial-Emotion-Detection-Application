@@ -1,1 +1,1 @@
-# Development-of-a-Well-being-Support-Application-Using-Facial-Emotion-Detection
+# Facial-Emotion-Detection-Application
