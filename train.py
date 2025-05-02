@@ -35,23 +35,23 @@ def train_model(model, trainloader, validloader, device, epochs=100, visualize_l
         model.train()
         running_loss = 0
         tr_accuracy = 0
-        
+       
         print(f"[1/2] Training phase:")
-        train_bar = tqdm(enumerate(trainloader), total=total_train_batches, 
+        train_bar = tqdm(enumerate(trainloader), total=total_train_batches,
                          desc="Training", ncols=100, leave=True)
-        
+       
         for i, (images, labels) in train_bar:
             images = images.to(device)
             labels = labels.long().to(device)
             optimizer.zero_grad()
-            
+           
             log_ps = model(images)
             loss = criterion(log_ps, labels)
             loss.backward()
             optimizer.step()
-            
+           
             running_loss += loss.item()
-            
+           
             ps = torch.exp(log_ps)
             top_p, top_class = ps.topk(1, dim=1)
             equals = top_class == labels.view(*top_class.shape)
@@ -59,7 +59,7 @@ def train_model(model, trainloader, validloader, device, epochs=100, visualize_l
             tr_accuracy += batch_acc
 
             train_bar.set_postfix({
-                'loss': f"{loss.item():.4f}", 
+                'loss': f"{loss.item():.4f}",
                 'acc': f"{batch_acc:.4f}"
             })
 
@@ -67,19 +67,19 @@ def train_model(model, trainloader, validloader, device, epochs=100, visualize_l
         accuracy = 0
         all_preds = []
         all_labels = []
-        
+       
         print(f"\n[2/2] Validation phase:")
         with torch.no_grad():
             model.eval()
-            val_bar = tqdm(enumerate(validloader), total=total_val_batches, 
+            val_bar = tqdm(enumerate(validloader), total=total_val_batches,
                           desc="Validation", ncols=100, leave=True)
-            
+           
             for i, (images, labels) in val_bar:
                 images = images.to(device)
                 labels = labels.long().to(device)
                 log_ps = model(images)
                 test_loss += criterion(log_ps, labels)
-                
+               
                 ps = torch.exp(log_ps)
                 top_p, top_class = ps.topk(1, dim=1)
                 equals = top_class == labels.view(*top_class.shape)
@@ -90,7 +90,7 @@ def train_model(model, trainloader, validloader, device, epochs=100, visualize_l
                 all_labels.extend(labels.cpu().numpy())
 
                 val_bar.set_postfix({
-                    'loss': f"{criterion(log_ps, labels).item():.4f}", 
+                    'loss': f"{criterion(log_ps, labels).item():.4f}",
                     'acc': f"{batch_acc:.4f}"
                 })
 
@@ -116,7 +116,7 @@ def train_model(model, trainloader, validloader, device, epochs=100, visualize_l
         time_per_epoch = (datetime.now() - start_time).total_seconds() / (e + 1)
         est_time_remaining = time_per_epoch * (epochs - (e + 1))
         est_finish_time = datetime.now() + pd.Timedelta(seconds=est_time_remaining)
-        
+       
         print(f"• ETA:           {time.strftime('%H:%M:%S', time.gmtime(est_time_remaining))}")
         print(f"• Est. finish:   {est_finish_time.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{'-' * 60}")
@@ -128,7 +128,7 @@ def train_model(model, trainloader, validloader, device, epochs=100, visualize_l
             valid_loss_min = test_loss_val
             best_epoch = e + 1
 
-            if e > 0: 
+            if e > 0:
                 cm = confusion_matrix(all_labels, all_preds)
                 save_confusion_matrix(cm, 'confusion_matrix_best.png')
 
@@ -174,30 +174,132 @@ def train_model(model, trainloader, validloader, device, epochs=100, visualize_l
         plt.title('Loss vs Accuracy')
         plt.legend()
         plt.savefig('loss_vs_accuracy.png', dpi=300, bbox_inches='tight')
-        
+       
         print("Learning curve visualizations saved!")
         plt.show()
 
     print("Evaluating best model...")
     load_and_evaluate_best_model(model, validloader, device)
-    
+   
     return model
 
 
 def save_confusion_matrix(cm, filename):
     plt.figure(figsize=(10, 8))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False)
+    emotion_classes = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+               xticklabels=emotion_classes,
+               yticklabels=emotion_classes,
+               cbar=False)
     plt.title('Confusion Matrix')
     plt.xlabel('Predicted Labels')
     plt.ylabel('True Labels')
     plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.close()
 
+def create_performance_table_image(emotion_classes, per_class_acc, report, overall_accuracy):
+    fig, ax = plt.subplots(figsize=(12, 8))
+
+    ax.axis('tight')
+    ax.axis('off')
+
+    table_data = []
+    headers = ['Class', 'Accuracy', 'Precision', 'Recall', 'F1-Score', 'Support']
+    table_data.append(headers)
+
+    for i, cls in enumerate(emotion_classes):
+        precision = float(report[cls]['precision']) if hasattr(report[cls]['precision'], 'item') else float(report[cls]['precision'])
+        recall = float(report[cls]['recall']) if hasattr(report[cls]['recall'], 'item') else float(report[cls]['recall'])
+        f1_score = float(report[cls]['f1-score']) if hasattr(report[cls]['f1-score'], 'item') else float(report[cls]['f1-score'])
+        support = int(report[cls]['support']) if hasattr(report[cls]['support'], 'item') else int(report[cls]['support'])
+       
+        row = [
+            cls,
+            f"{float(per_class_acc[i]):.4f}",
+            f"{precision:.4f}",
+            f"{recall:.4f}",
+            f"{f1_score:.4f}",
+            f"{support}"
+        ]
+        table_data.append(row)
+
+    try:
+        total_support = sum(int(report[cls]['support']) if hasattr(report[cls]['support'], 'item') else int(report[cls]['support']) for cls in emotion_classes)
+        avg_acc = sum(float(acc) for acc in per_class_acc) / len(per_class_acc)
+
+        macro_precision = float(report['macro avg']['precision']) if hasattr(report['macro avg']['precision'], 'item') else float(report['macro avg']['precision'])
+        macro_recall = float(report['macro avg']['recall']) if hasattr(report['macro avg']['recall'], 'item') else float(report['macro avg']['recall'])
+        macro_f1 = float(report['macro avg']['f1-score']) if hasattr(report['macro avg']['f1-score'], 'item') else float(report['macro avg']['f1-score'])
+       
+        weighted_precision = float(report['weighted avg']['precision']) if hasattr(report['weighted avg']['precision'], 'item') else float(report['weighted avg']['precision'])
+        weighted_recall = float(report['weighted avg']['recall']) if hasattr(report['weighted avg']['recall'], 'item') else float(report['weighted avg']['recall'])
+        weighted_f1 = float(report['weighted avg']['f1-score']) if hasattr(report['weighted avg']['f1-score'], 'item') else float(report['weighted avg']['f1-score'])
+
+        table_data.append([
+            'Macro Avg',
+            f"{avg_acc:.4f}",
+            f"{macro_precision:.4f}",
+            f"{macro_recall:.4f}",
+            f"{macro_f1:.4f}",
+            f"{total_support}"
+        ])
+
+        table_data.append([
+            'Weighted Avg',
+            f"{avg_acc:.4f}",
+            f"{weighted_precision:.4f}",
+            f"{weighted_recall:.4f}",
+            f"{weighted_f1:.4f}",
+            f"{total_support}"
+        ])
+
+        overall_acc = float(overall_accuracy) if hasattr(overall_accuracy, 'item') else float(overall_accuracy)
+        table_data.append([
+            'Overall',
+            f"{overall_acc:.4f}",
+            '—',
+            '—',
+            '—',
+            f"{total_support}"
+        ])
+    except Exception as e:
+        print(f"Error creating summary rows: {e}")
+        table_data.append(['Summary data unavailable due to formatting error', '', '', '', '', ''])
+
+    table = ax.table(
+        cellText=table_data[1:],
+        colLabels=table_data[0],
+        loc='center',
+        cellLoc='center',
+        colColours=['#f2f2f2'] * len(headers)
+    )
+
+    table.auto_set_font_size(False)
+    table.set_fontsize(12)
+    table.scale(1.2, 2)
+   
+    try:
+        for (i, j), cell in table.get_celld().items():
+            if j == 0:  
+                cell.set_text_props(weight='bold')
+                cell.set_facecolor('#e6f2ff')
+            if i == len(emotion_classes) or i == len(emotion_classes) + 1:  
+                cell.set_facecolor('#ffffcc')
+            if i == len(emotion_classes) + 2:  
+                cell.set_facecolor('#e6ffe6')
+    except Exception as e:
+        print(f"Error formatting table cells: {e}")
+
+    plt.suptitle('Face Emotion Recognition - Performance Summary', fontsize=16, fontweight='bold', y=0.98)
+    plt.savefig('performance_summary_table.png', dpi=300, bbox_inches='tight')
+    plt.show()
+    print("Performance summary table saved as 'performance_summary_table.png'")
+
 def load_and_evaluate_best_model(model, dataloader, device):
     print(f"\n{'=' * 60}")
     print(f" MODEL EVALUATION ".center(60, '='))
     print(f"{'=' * 60}")
-    
+   
     model.load_state_dict(torch.load('best_model.pt', map_location=device))
     model.eval()
 
@@ -205,12 +307,12 @@ def load_and_evaluate_best_model(model, dataloader, device):
     all_labels = []
     class_correct = list(0. for i in range(7))
     class_total = list(0. for i in range(7))
-    
+   
     print("Testing best model on validation data...")
     with torch.no_grad():
-        eval_bar = tqdm(enumerate(dataloader), total=len(dataloader), 
+        eval_bar = tqdm(enumerate(dataloader), total=len(dataloader),
                       desc="Evaluating", ncols=100, leave=True)
-        
+       
         for i, (images, labels) in eval_bar:
             images = images.to(device)
             labels = labels.long().to(device)
@@ -227,7 +329,7 @@ def load_and_evaluate_best_model(model, dataloader, device):
 
             equals = top_class == labels.view(*top_class.shape)
             equals = equals.cpu().numpy()
-            
+           
             for i in range(len(labels)):
                 label = labels[i]
                 class_correct[label] += equals[i]
@@ -237,79 +339,101 @@ def load_and_evaluate_best_model(model, dataloader, device):
             eval_bar.set_postfix({'acc': f"{batch_acc:.4f}"})
 
     try:
-        print("\nGenerating classification reports and visualizations...")
-        
-        emotion_classes = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
-        report = classification_report(all_labels, all_preds, target_names=emotion_classes, output_dict=True)
+            print("\nGenerating classification reports and visualizations...")
+            emotion_classes = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 
-        df_report = pd.DataFrame(report).transpose()
-        df_report.to_csv('classification_report.csv')
+            report = classification_report(
+                all_labels,
+                all_preds,
+                target_names=emotion_classes,
+                output_dict=True,
+                zero_division=0  
+            )
 
-        print(f"\n{'-' * 60}")
-        print(f" CLASS PERFORMANCE SUMMARY ".center(60, '-'))
-        print(f"{'-' * 60}")
+            per_class_acc = [float(class_correct[i]/class_total[i]) if class_total[i] > 0 else 0.0 for i in range(7)]
 
-        per_class_acc = [class_correct[i]/class_total[i] if class_total[i] > 0 else 0 for i in range(7)]
+            print("\nCreating performance summary table...")
+            overall_accuracy = float(report['accuracy']) if hasattr(report['accuracy'], 'item') else float(report['accuracy'])
+            create_performance_table_image(emotion_classes, per_class_acc, report, overall_accuracy)
 
-        print(f"{'Class':<10} | {'Accuracy':<8} | {'Precision':<9} | {'Recall':<6} | {'F1-Score':<8}")
-        print(f"{'-' * 10}-+-{'-' * 8}-+-{'-' * 9}-+-{'-' * 6}-+-{'-' * 8}")
-        
-        for i, cls in enumerate(emotion_classes):
-            print(f"{cls:<10} | {per_class_acc[i]:.4f}   | {report[cls]['precision']:.4f}    | {report[cls]['recall']:.4f} | {report[cls]['f1-score']:.4f}")
-        
-        print(f"{'-' * 60}")
-        print(f"Overall Accuracy: {report['accuracy']:.4f}")
-        print(f"{'-' * 60}")
+            print("\nCreating class performance charts...")
+            plt.figure(figsize=(12, 8))
 
-        plt.figure(figsize=(12, 8))
+            plt.subplot(2, 1, 1)
+            bars = plt.bar(emotion_classes, per_class_acc, color='skyblue')
+            plt.title('Per-Class Accuracy')
+            plt.ylabel('Accuracy')
+            plt.ylim(0, 1.0)
+            plt.grid(axis='y', linestyle='--', alpha=0.7)
 
-        plt.subplot(2, 1, 1)
-        bars = plt.bar(emotion_classes, per_class_acc, color='skyblue')
-        plt.title('Per-Class Accuracy')
-        plt.ylabel('Accuracy')
-        plt.ylim(0, 1.0)
-        plt.grid(axis='y', linestyle='--', alpha=0.7)
+            for bar in bars:
+                height = bar.get_height()
+                plt.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                        f'{height:.2f}', ha='center', va='bottom', rotation=0)
 
-        for bar in bars:
-            height = bar.get_height()
-            plt.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-                    f'{height:.2f}', ha='center', va='bottom', rotation=0)
+            plt.subplot(2, 1, 2)
+            f1_scores = []
+            for cls in emotion_classes:
+                score = report[cls]['f1-score']
+                if hasattr(score, 'item'):
+                    score = float(score.item())
+                else:
+                    score = float(score)
+                f1_scores.append(score)
+           
+            bars = plt.bar(emotion_classes, f1_scores, color='lightgreen')
+            plt.title('F1 Score by Class')
+            plt.ylabel('F1 Score')
+            plt.ylim(0, 1.0)
+            plt.grid(axis='y', linestyle='--', alpha=0.7)
 
-        plt.subplot(2, 1, 2)
-        f1_scores = [report[cls]['f1-score'] for cls in emotion_classes]
-        bars = plt.bar(emotion_classes, f1_scores, color='lightgreen')
-        plt.title('F1 Score by Class')
-        plt.ylabel('F1 Score')
-        plt.ylim(0, 1.0)
-        plt.grid(axis='y', linestyle='--', alpha=0.7)
+            for bar in bars:
+                height = bar.get_height()
+                plt.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                        f'{height:.2f}', ha='center', va='bottom', rotation=0)
+       
+            plt.tight_layout()
+            plt.savefig('class_performance.png', dpi=300, bbox_inches='tight')
+            plt.show()
 
-        for bar in bars:
-            height = bar.get_height()
-            plt.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-                    f'{height:.2f}', ha='center', va='bottom', rotation=0)
-        
-        plt.tight_layout()
-        plt.savefig('class_performance.png', dpi=300, bbox_inches='tight')
-        plt.show()
-
-        cm = confusion_matrix(all_labels, all_preds)
-        plt.figure(figsize=(10, 8))
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=emotion_classes, 
-                   yticklabels=emotion_classes, cbar=False)
-        plt.title('Confusion Matrix')
-        plt.xlabel('Predicted Labels')
-        plt.ylabel('True Labels')
-        plt.tight_layout()
-        plt.savefig('final_confusion_matrix.png', dpi=300, bbox_inches='tight')
-        plt.show()
-        
-        print("Evaluation visualizations saved!")
-        
+            print("\nCreating confusion matrix visualization...")
+            cm = confusion_matrix(all_labels, all_preds)
+            plt.figure(figsize=(10, 8))
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                    xticklabels=emotion_classes,
+                    yticklabels=emotion_classes,
+                    cbar=False)
+            plt.title('Confusion Matrix')
+            plt.xlabel('Predicted Labels')
+            plt.ylabel('True Labels')
+            plt.tight_layout()
+            plt.savefig('final_confusion_matrix.png', dpi=300, bbox_inches='tight')
+            plt.show()
+       
+            print("All evaluation visualizations saved!")
+       
     except Exception as e:
         print(f"Error in generating classification report: {e}")
-        cm = confusion_matrix(all_labels, all_preds)
-        save_confusion_matrix(cm, 'final_confusion_matrix.png')
-    
+        import traceback
+        traceback.print_exc()
+
+        try:
+            cm = confusion_matrix(all_labels, all_preds)
+            plt.figure(figsize=(10, 8))
+            emotion_classes = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                    xticklabels=emotion_classes,
+                    yticklabels=emotion_classes,
+                    cbar=False)
+            plt.title('Confusion Matrix')
+            plt.xlabel('Predicted Labels')
+            plt.ylabel('True Labels')
+            plt.tight_layout()
+            plt.savefig('final_confusion_matrix.png', dpi=300, bbox_inches='tight')
+            print("Confusion matrix with labels saved despite errors.")
+        except Exception as inner_e:
+            print(f"Failed to save confusion matrix: {inner_e}")
+   
     print(f"\n{'=' * 60}")
     print(f" EVALUATION COMPLETE ".center(60, '='))
     print(f"{'=' * 60}\n")
@@ -319,13 +443,13 @@ def spinner_animation(text="Loading", duration=5):
     spinner = "|/-\\"
     i = 0
     start_time = time.time()
-    
+
     while time.time() - start_time < duration:
         sys.stdout.write(f"\r{text} {spinner[i % len(spinner)]}")
         sys.stdout.flush()
         time.sleep(0.1)
         i += 1
-    
+
     sys.stdout.write(f"\r{text} Done!      \n")
     sys.stdout.flush()
 
@@ -345,20 +469,20 @@ def main():
 
     print("\nChecking for available hardware...")
     spinner_animation("Detecting hardware", 1)
-    
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     print("\nLoading dataset...")
     spinner_animation("Preprocessing data", 2)
-    
+
     trainloader, validloader = get_dataloaders()
     print('Data processed successfully!')
 
     print("\nInitializing model architecture...")
     spinner_animation("Building model", 1)
-    
+
     model = Face_Emotion_CNN().to(device)
-    
+
     if device.type == 'cuda':
         print('GPU Found! Moving Model to CUDA.')
         if torch.cuda.get_device_name(0):
@@ -368,11 +492,12 @@ def main():
 
     print("\nPreparing for training...")
     spinner_animation("Preparing", 1)
-    
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     print(f"Training run started at: {timestamp}")
 
     print("\nStarting training process...")
-    model = train_model(model, trainloader, validloader, device, epochs=100) 
+    model = train_model(model, trainloader, validloader, device, epochs=50)
+
 if __name__ == '__main__':
     main()
