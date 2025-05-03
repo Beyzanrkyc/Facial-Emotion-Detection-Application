@@ -4,12 +4,10 @@ from utils.db_handler import save_user, verify_duplicate_user
 import time
 
 def is_valid_email(email):
-    """Check if the provided email is valid using regex."""
     email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return re.match(email_regex, email) is not None
 
 def signup_page(extra_input_params=False, confirmPass=False):
-    """Render the signup page with username and age fields."""
     if st.button("Back to Login"):
         st.session_state['page'] = 'login'
         st.rerun()

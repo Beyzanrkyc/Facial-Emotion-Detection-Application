@@ -14,7 +14,6 @@ db_params = {
 }
 
 def get_db_connection():
-    """Create and return a database connection"""
     try:
         conn = psycopg2.connect(**db_params)
         return conn
@@ -23,32 +22,18 @@ def get_db_connection():
         return None
 
 def authenticate_user(email, password):
-    """
-    Authenticate a user with email and password
-    
-    Args:
-        email (str): User email
-        password (str): User password
-    
-    Returns:
-        tuple: (bool, dict) - Success status and user data if successful
-    """
+
     conn = get_db_connection()
     if not conn:
         return False, None
     
     try:
         cur = conn.cursor()
-        
-        # Get user details from database
         cur.execute("SELECT id, email, hash_password, username, age FROM users WHERE email = %s", (email,))
         user = cur.fetchone()
-        
-        # Check if user exists and password is correct
+
         if user:
-            # user[2] is the stored hashed password
             if bcrypt.checkpw(password.encode('utf-8'), user[2].encode('utf-8')):
-                # Return user data as dictionary
                 user_data = {
                     'user_id': user[0],
                     'email': user[1],
@@ -66,15 +51,7 @@ def authenticate_user(email, password):
             conn.close()
 
 def verify_duplicate_user(email):
-    """
-    Check if a user with the given email already exists
-    
-    Args:
-        email (str): Email to check
-    
-    Returns:
-        bool: True if user exists, False otherwise
-    """
+
     conn = get_db_connection()
     if not conn:
         return False
@@ -92,17 +69,7 @@ def verify_duplicate_user(email):
             conn.close()
 
 def save_user(email, password, user_data):
-    """
-    Save a new user to the database
-    
-    Args:
-        email (str): User email
-        password (str): User password (plain text)
-        user_data (dict): Additional user data like username and age
-    
-    Returns:
-        tuple: (bool, int|str) - Success status and user ID if successful, or error message
-    """
+
     conn = get_db_connection()
     if not conn:
         return False, "Database connection failed"
@@ -136,15 +103,6 @@ def save_user(email, password, user_data):
             conn.close()
 
 def get_user_by_id(user_id):
-    """
-    Get user data by user ID
-    
-    Args:
-        user_id (int): User ID
-    
-    Returns:
-        dict: User data or None if not found
-    """
     conn = get_db_connection()
     if not conn:
         return None

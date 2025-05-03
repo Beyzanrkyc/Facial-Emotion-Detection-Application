@@ -6,63 +6,31 @@ import uuid
 from datetime import datetime
 
 def make_hashed_password(password):
-    """
-    Create a hashed password
-    
-    Args:
-        password (str): Plain text password
-        
-    Returns:
-        str: Hashed password
-    """
     return hashlib.sha256(str.encode(password)).hexdigest()
 
 def create_user_directory(username):
-    """
-    Create a directory for user data
-    
-    Args:
-        username (str): Username
-    """
+
     user_dir = f"data/users/{username}"
     os.makedirs(user_dir, exist_ok=True)
     return user_dir
 
 def initialize_user_system():
-    """
-    Initialize the user management system
-    """
-    # Create necessary directories
     os.makedirs("data", exist_ok=True)
     os.makedirs("data/users", exist_ok=True)
-    
-    # Create users database if it doesn't exist
+
     if not os.path.exists("data/users.csv"):
         users_df = pd.DataFrame(columns=["username", "password", "created_at"])
         users_df.to_csv("data/users.csv", index=False)
 
 def register_user(username, password):
-    """
-    Register a new user
-    
-    Args:
-        username (str): Username
-        password (str): Password
-        
-    Returns:
-        bool: True if registration successful, False otherwise
-    """
-    # Check if user already exists
+
     if user_exists(username):
         return False
-    
-    # Hash the password
+
     hashed_password = make_hashed_password(password)
-    
-    # Create user directory
+
     create_user_directory(username)
-    
-    # Add user to database
+
     users_df = pd.read_csv("data/users.csv")
     new_user = pd.DataFrame({
         "username": [username],
@@ -75,16 +43,7 @@ def register_user(username, password):
     return True
 
 def authenticate_user(username, password):
-    """
-    Authenticate a user
-    
-    Args:
-        username (str): Username
-        password (str): Password
-        
-    Returns:
-        bool: True if authentication successful, False otherwise
-    """
+
     if not user_exists(username):
         return False
     
@@ -98,15 +57,7 @@ def authenticate_user(username, password):
     return user_record.iloc[0]["password"] == hashed_password
 
 def user_exists(username):
-    """
-    Check if a user exists
-    
-    Args:
-        username (str): Username
-        
-    Returns:
-        bool: True if user exists, False otherwise
-    """
+
     if not os.path.exists("data/users.csv"):
         return False
     
@@ -114,35 +65,18 @@ def user_exists(username):
     return username in users_df["username"].values
 
 def get_user_data_path(username, filename="emotion_data.csv"):
-    """
-    Get the path to a user's data file
-    
-    Args:
-        username (str): Username
-        filename (str): Filename (default: emotion_data.csv)
-        
-    Returns:
-        str: Path to the user's data file
-    """
+
     return f"data/users/{username}/{filename}"
 
 def auth_page():
-    """
-    Display authentication page
-    
-    Returns:
-        bool: True if user is authenticated, False otherwise
-    """
-    # Initialize user system
+
     initialize_user_system()
-    
-    # Check if user is already logged in
+
     if "user_authenticated" in st.session_state and st.session_state["user_authenticated"]:
         return True
     
     st.title("Emotion Tracking - User Authentication")
-    
-    # Create tabs for login and registration
+
     tab1, tab2 = st.tabs(["Login", "Register"])
     
     with tab1:
@@ -155,7 +89,6 @@ def auth_page():
                 st.session_state["user_authenticated"] = True
                 st.session_state["username"] = username
                 st.success("Login successful!")
-                # Force a rerun to update the page
                 st.experimental_rerun()
             else:
                 st.error("Invalid username or password")
@@ -176,7 +109,6 @@ def auth_page():
             else:
                 if register_user(new_username, new_password):
                     st.success("Registration successful! You can now login.")
-                    # Clear the registration form
                     st.session_state["reg_username"] = ""
                     st.session_state["reg_password"] = ""
                     st.session_state["confirm_password"] = ""
@@ -188,9 +120,6 @@ def auth_page():
     return False
 
 def logout_user():
-    """
-    Log out the current user
-    """
     if "user_authenticated" in st.session_state:
         st.session_state["user_authenticated"] = False
     if "username" in st.session_state:
