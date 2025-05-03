@@ -122,8 +122,8 @@ def train_model(model, trainloader, validloader, device, epochs=100, visualize_l
         print(f"{'-' * 60}")
 
         if test_loss_val <= valid_loss_min:
-            print(f"📥 Validation loss decreased ({valid_loss_min:.6f} --> {test_loss_val:.6f})")
-            print(f"📥 Saving model from epoch {e+1}...")
+            print(f"Validation loss decreased ({valid_loss_min:.6f} --> {test_loss_val:.6f})")
+            print(f"Saving model from epoch {e+1}...")
             torch.save(model.state_dict(), 'best_model.pt')
             valid_loss_min = test_loss_val
             best_epoch = e + 1
@@ -457,15 +457,6 @@ def main():
     print(f"\n{'=' * 60}")
     print(f" FACE EMOTION RECOGNITION TRAINING ".center(60, '='))
     print(f"{'=' * 60}")
-
-    try:
-        import tqdm
-    except ImportError:
-        print("Installing tqdm for progress visualization...")
-        spinner_animation("Installing tqdm", 2)
-        os.system('pip install tqdm')
-        from tqdm import tqdm
-        print("tqdm installed successfully!")
 
     print("\nChecking for available hardware...")
     spinner_animation("Detecting hardware", 1)
